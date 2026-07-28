@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\OIDCLogin\Controller;
 
 use OCA\OIDCLogin\Provider\OpenIDConnectClient;

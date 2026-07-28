@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\OIDCLogin\WebDAV;
 
 use OCA\DAV\Events\SabrePluginAuthInitEvent;
@@ -108,7 +110,7 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         return $this->principalPrefix.$userId;
     }
 
-    private function login(string $username, string $password)
+    private function login(string $username, string $password): void
     {
         $client = $this->loginService->createOIDCClient();
         if (null === $client) {

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\OIDCLogin\WebDAV;
 
 use OCA\DAV\Events\SabrePluginAuthInitEvent;
@@ -105,7 +107,7 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
      *
      * @param string $bearerToken an OIDC JWT bearer token
      */
-    private function login(string $bearerToken)
+    private function login(string $bearerToken): void
     {
         $client = $this->loginService->createOIDCClient();
         if (null === $client) {

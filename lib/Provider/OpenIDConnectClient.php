@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\OIDCLogin\Provider;
 
 require_once __DIR__.'/../../3rdparty/autoload.php';
@@ -219,22 +221,22 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
         return $this->session->get($key);
     }
 
-    protected function setSessionKey($key, $value)
+    protected function setSessionKey($key, $value): void
     {
         $this->session->set($key, $value);
     }
 
-    protected function unsetSessionKey($key)
+    protected function unsetSessionKey($key): void
     {
         $this->session->remove($key);
     }
 
-    protected function startSession()
+    protected function startSession(): void
     {
         $this->session->set('is_oidc', 1);
     }
 
-    protected function commitSession()
+    protected function commitSession(): void
     {
         $this->startSession();
     }

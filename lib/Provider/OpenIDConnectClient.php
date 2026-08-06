@@ -69,9 +69,9 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
             $this->setHttpProxy($proxy);
         }
 
-        $this->publicKeyCachingTime = $this->config->getSystemValue('oidc_login_public_key_caching_time', self::DEFAULT_PUBLIC_KEY_CACHING_TIME);
-        $this->minTimeBetweenJwksRequests = $this->config->getSystemValue('oidc_login_min_time_between_jwks_requests', self::DEFAULT_MIN_TIME_BETWEEN_JWKS_REQUESTS);
-        $this->wellKnownCachingTime = $this->config->getSystemValue('oidc_login_well_known_caching_time', self::DEFAULT_WELL_KNOWN_CACHING_TIME);
+        $this->publicKeyCachingTime = $this->config->getSystemValueInt('oidc_login_public_key_caching_time', self::DEFAULT_PUBLIC_KEY_CACHING_TIME);
+        $this->minTimeBetweenJwksRequests = $this->config->getSystemValueInt('oidc_login_min_time_between_jwks_requests', self::DEFAULT_MIN_TIME_BETWEEN_JWKS_REQUESTS);
+        $this->wellKnownCachingTime = $this->config->getSystemValueInt('oidc_login_well_known_caching_time', self::DEFAULT_WELL_KNOWN_CACHING_TIME);
     }
 
     /**

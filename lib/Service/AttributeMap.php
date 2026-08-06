@@ -194,9 +194,9 @@ class AttributeMap
     /**
      * Get admin status from profile.
      */
-    public function isAdmin(array $profile): ?string
+    public function isAdmin(array $profile): bool
     {
-        return self::get($this->_isAdmin, $profile);
+        return boolval(self::get($this->_isAdmin, $profile));
     }
 
     /**

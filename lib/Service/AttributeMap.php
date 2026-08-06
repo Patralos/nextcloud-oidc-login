@@ -196,7 +196,7 @@ class AttributeMap
      */
     public function isAdmin(array $profile): bool
     {
-        return boolval(self::get($this->_isAdmin, $profile));
+        return (bool) self::get($this->_isAdmin, $profile);
     }
 
     /**

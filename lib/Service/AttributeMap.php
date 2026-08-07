@@ -134,7 +134,12 @@ class AttributeMap
      */
     public function quota(array $profile): ?string
     {
-        return self::get($this->_quota, $profile);
+        $quota = self::get($this->_quota, $profile);
+        if (null !== $quota) {
+            return (string) $quota;
+        }
+
+        return null;
     }
 
     /**

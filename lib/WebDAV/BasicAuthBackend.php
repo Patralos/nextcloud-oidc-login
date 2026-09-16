@@ -9,8 +9,10 @@ use OCA\OIDCLogin\Service\LoginService;
 use OCP\Defaults;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
+use OCP\Files\ISetupManager;
 use OCP\IConfig;
 use OCP\ISession;
+use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\SabrePluginEvent;
 use Psr\Log\LoggerInterface;
@@ -28,6 +30,8 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
     private IConfig $config;
     private LoggerInterface $logger;
     private LoginService $loginService;
+    private IUserManager $userManager;
+    private ISetupManager $setupManager;
 
     public function __construct(
         string $appName,
@@ -36,6 +40,8 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         IConfig $config,
         LoggerInterface $logger,
         LoginService $loginService,
+        IUserManager $userManager,
+        ISetupManager $setupManager,
         string $principalPrefix = 'principals/users/'
     ) {
         $this->appName = $appName;
@@ -44,6 +50,8 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         $this->config = $config;
         $this->logger = $logger;
         $this->loginService = $loginService;
+        $this->userManager = $userManager;
+        $this->setupManager = $setupManager;
         $this->principalPrefix = $principalPrefix;
 
         // setup realm
@@ -60,7 +68,7 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
     #[\Override]
     public function validateUserPass($username, $password)
     {
-        \OC_Util::setupFS(); // login hooks may need early access to the filesystem
+        $this->setupFs(); // login hooks may need early access to the filesystem
 
         if (!$this->userSession->isLoggedIn()) {
             try {
@@ -113,7 +121,7 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
 
     private function setupUserFs(string $userId): string
     {
-        \OC_Util::setupFS($userId);
+        $this->setupFs($userId);
 
         /* On the v1 route /remote.php/webdav, a default nextcloud backend
          * tries and fails to authenticate users, then close the session.
@@ -125,6 +133,23 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         }
 
         return $this->principalPrefix.$userId;
+    }
+
+    /** Set up the user filesystem, or root if no user is available. */
+    private function setupFs(?string $userId = null): void
+    {
+        if (null === $userId) {
+            $user = $this->userSession->getUser();
+        } else {
+            $user = $this->userManager->get($userId);
+        }
+
+        if (null !== $user) {
+            $this->setupManager->setupForUser($user);
+        } else {
+            // A path without a user falls back to root setup internally
+            $this->setupManager->setupForPath('/');
+        }
     }
 
     private function login(string $username, string $password): void

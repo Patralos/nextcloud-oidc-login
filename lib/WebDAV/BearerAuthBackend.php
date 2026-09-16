@@ -9,8 +9,10 @@ use OCA\OIDCLogin\Service\LoginService;
 use OCP\Defaults;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
+use OCP\Files\ISetupManager;
 use OCP\IConfig;
 use OCP\ISession;
+use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\SabrePluginEvent;
 use Psr\Log\LoggerInterface;
@@ -28,6 +30,8 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
     private IConfig $config;
     private LoggerInterface $logger;
     private LoginService $loginService;
+    private IUserManager $userManager;
+    private ISetupManager $setupManager;
     private string $principalPrefix;
 
     public function __construct(
@@ -37,6 +41,8 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
         IConfig $config,
         LoggerInterface $logger,
         LoginService $loginService,
+        IUserManager $userManager,
+        ISetupManager $setupManager,
         string $principalPrefix = 'principals/users/'
     ) {
         $this->appName = $appName;
@@ -45,6 +51,8 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
         $this->config = $config;
         $this->logger = $logger;
         $this->loginService = $loginService;
+        $this->userManager = $userManager;
+        $this->setupManager = $setupManager;
         $this->principalPrefix = $principalPrefix;
 
         // setup realm
@@ -60,7 +68,7 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
     #[\Override]
     public function validateBearerToken($bearerToken)
     {
-        \OC_Util::setupFS(); // login hooks may need early access to the filesystem
+        $this->setupFs(); // login hooks may need early access to the filesystem
 
         if (!$this->userSession->isLoggedIn()) {
             try {
@@ -110,10 +118,27 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
 
     private function setupUserFs(string $userId): string
     {
-        \OC_Util::setupFS($userId);
+        $this->setupFs($userId);
         $this->session->close();
 
         return $this->principalPrefix.$userId;
+    }
+
+    /** Set up the user filesystem, or root if no user is available. */
+    private function setupFs(?string $userId = null): void
+    {
+        if (null === $userId) {
+            $user = $this->userSession->getUser();
+        } else {
+            $user = $this->userManager->get($userId);
+        }
+
+        if (null !== $user) {
+            $this->setupManager->setupForUser($user);
+        } else {
+            // A path without a user falls back to root setup internally
+            $this->setupManager->setupForPath('/');
+        }
     }
 
     /**

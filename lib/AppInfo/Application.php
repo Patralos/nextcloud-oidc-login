@@ -6,6 +6,7 @@ namespace OCA\OIDCLogin\AppInfo;
 
 use OC\AppFramework\Utility\ControllerMethodReflector;
 use OCA\OIDCLogin\OIDCLoginOption;
+use OCA\OIDCLogin\OIDCLoginProvider;
 use OCA\OIDCLogin\WebDAV\BasicAuthBackend;
 use OCA\OIDCLogin\WebDAV\BearerAuthBackend;
 use OCP\AppFramework\App;
@@ -37,7 +38,7 @@ class Application extends App implements IBootstrap
     #[\Override]
     public function register(IRegistrationContext $context): void
     {
-        $context->registerAlternativeLogin(OIDCLoginOption::class);
+        $context->registerAlternativeLoginProvider(OIDCLoginProvider::class);
 
         $context->registerEventListener(
             'OCA\DAV\Connector\Sabre::authInit',

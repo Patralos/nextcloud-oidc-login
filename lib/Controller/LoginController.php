@@ -19,6 +19,7 @@ use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserSession;
+use OCP\Template\ITemplateManager;
 
 class LoginController extends Controller
 {
@@ -27,6 +28,7 @@ class LoginController extends Controller
     private IUserSession $userSession;
     private ISession $session;
     private LoginService $loginService;
+    private ITemplateManager $templateManager;
 
     public function __construct(
         string $appName,
@@ -35,7 +37,8 @@ class LoginController extends Controller
         IURLGenerator $urlGenerator,
         IUserSession $userSession,
         ISession $session,
-        LoginService $loginService
+        LoginService $loginService,
+        ITemplateManager $templateManager
     ) {
         parent::__construct($appName, $request);
         $this->config = $config;
@@ -43,6 +46,7 @@ class LoginController extends Controller
         $this->userSession = $userSession;
         $this->session = $session;
         $this->loginService = $loginService;
+        $this->templateManager = $templateManager;
     }
 
     #[PublicPage]
@@ -77,7 +81,7 @@ class LoginController extends Controller
             }
 
             // Show error page
-            \OC_Template::printErrorPage($e->getMessage());
+            $this->templateManager->printErrorPage($e->getMessage());
         }
     }
 

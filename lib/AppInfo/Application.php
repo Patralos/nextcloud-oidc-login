@@ -27,13 +27,14 @@ class Application extends App implements IBootstrap
     protected IL10N $l;
     protected IConfig $config;
 
-    private $appName = 'oidc_login';
+    private string $appName = 'oidc_login';
 
     public function __construct()
     {
         parent::__construct($this->appName);
     }
 
+    #[\Override]
     public function register(IRegistrationContext $context): void
     {
         $context->registerAlternativeLogin(OIDCLoginOption::class);
@@ -59,6 +60,7 @@ class Application extends App implements IBootstrap
         );
     }
 
+    #[\Override]
     public function boot(IBootContext $context): void
     {
         $container = $context->getAppContainer();
@@ -159,7 +161,7 @@ class Application extends App implements IBootstrap
         }
     }
 
-    public function isApiRequest()
+    public function isApiRequest(): bool
     {
         return isset($_SERVER['HTTP_ACCEPT']) && false !== strpos($_SERVER['HTTP_ACCEPT'], 'application/json');
     }

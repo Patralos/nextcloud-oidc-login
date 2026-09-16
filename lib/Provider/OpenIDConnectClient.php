@@ -14,19 +14,19 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
 {
     // Keycloak uses a default of 86400 seconds (1 day) as caching time for public keys
     // https://www.keycloak.org/docs/latest/securing_apps/index.html#_java_adapter_config
-    private const DEFAULT_PUBLIC_KEY_CACHING_TIME = 86400;
+    private const int DEFAULT_PUBLIC_KEY_CACHING_TIME = 86400;
 
     // Avoid DoSing provider by issuing too many requests triggered by an attacker with bad kids
     // Keycloak uses a default of 10 seconds as a minimum time between JWKS requests
     // https://www.keycloak.org/docs/latest/securing_apps/index.html#_java_adapter_config
-    private const DEFAULT_MIN_TIME_BETWEEN_JWKS_REQUESTS = 10;
+    private const int DEFAULT_MIN_TIME_BETWEEN_JWKS_REQUESTS = 10;
 
-    private const WELL_KNOWN_CONFIGURATION = '/.well-known/openid-configuration';
+    private const string WELL_KNOWN_CONFIGURATION = '/.well-known/openid-configuration';
     // .well-known/openid-configuration shouldn't change much, so we default to 1 day.
-    private const DEFAULT_WELL_KNOWN_CACHING_TIME = 86400;
+    private const int DEFAULT_WELL_KNOWN_CACHING_TIME = 86400;
 
     // Don't skip Nextcloud HTTP proxy by default
-    private const DEFAULT_SKIP_PROXY = false;
+    private const bool DEFAULT_SKIP_PROXY = false;
 
     private ISession $session;
     private IConfig $config;
@@ -83,6 +83,7 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
      *
      * @throws \Jumbojett\OpenIDConnectClientException
      */
+    #[\Override]
     public function verifyJWTsignature($jwt)
     {
         try {
@@ -168,14 +169,26 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
 
                 $parts = explode('.', $token);
 
-                $joseHeader = json_decode(\Jumbojett\base64url_decode($parts[0]));
+                $decodedHeader = \Jumbojett\base64url_decode($parts[0]);
+                if (!\is_string($decodedHeader)) {
+                    $this->accessTokenIsJWT = false;
+
+                    return false;
+                }
+                $joseHeader = json_decode($decodedHeader);
                 if (null === $joseHeader || !property_exists($joseHeader, 'alg')) {
                     $this->accessTokenIsJWT = false;
 
                     return false;
                 }
 
-                if (null === json_decode(\Jumbojett\base64url_decode($parts[1]))) {
+                $decodedPayload = \Jumbojett\base64url_decode($parts[1]);
+                if (!\is_string($decodedPayload)) {
+                    $this->accessTokenIsJWT = false;
+
+                    return false;
+                }
+                if (null === json_decode($decodedPayload)) {
                     $this->accessTokenIsJWT = false;
 
                     return false;
@@ -198,11 +211,16 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
     public function getEndSessionUrl(string $post_logout_redirect_uri): string
     {
         $id_token_hint = $this->getIdToken();
-        $end_session_endpoint = null;
 
         try {
             $end_session_endpoint = $this->getProviderConfigValue('end_session_endpoint');
         } catch (\Exception $e) {
+            throw new \Exception("end_session_endpoint could not be fetched.\n"
+                                 ."Your OIDC provider probably does not support logout.\n"
+                                 .'Set "oidc_login_end_session_redirect" => false in Nextcloud config.');
+        }
+
+        if (!\is_string($end_session_endpoint)) {
             throw new \Exception("end_session_endpoint could not be fetched.\n"
                                  ."Your OIDC provider probably does not support logout.\n"
                                  .'Set "oidc_login_end_session_redirect" => false in Nextcloud config.');
@@ -216,31 +234,54 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
         return $end_session_endpoint;
     }
 
-    protected function getSessionKey($key)
+    /**
+     * @param string $key
+     */
+    #[\Override]
+    protected function getSessionKey($key): mixed
     {
         return $this->session->get($key);
     }
 
+    /**
+     * @param string $key
+     * @param mixed  $value
+     */
+    #[\Override]
     protected function setSessionKey($key, $value): void
     {
         $this->session->set($key, $value);
     }
 
+    /**
+     * @param string $key
+     */
+    #[\Override]
     protected function unsetSessionKey($key): void
     {
         $this->session->remove($key);
     }
 
+    #[\Override]
     protected function startSession(): void
     {
         $this->session->set('is_oidc', 1);
     }
 
+    #[\Override]
     protected function commitSession(): void
     {
         $this->startSession();
     }
 
+    /**
+     * @param string                  $url
+     * @param null|string             $post_body
+     * @param array<array-key, mixed> $headers
+     *
+     * @return mixed
+     */
+    #[\Override]
     protected function fetchURL($url, $post_body = null, $headers = [])
     {
         // this must be an exact match as for IdentityServer the JWKS uri is a path below .well-knowm
@@ -261,7 +302,7 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
      * for the configured amount of time. This reduces the requests required
      * to the provider. The openid-configuration shouldn't change much anyway.
      */
-    private function getWellKnown(string $url)
+    private function getWellKnown(string $url): mixed
     {
         $lastFetched = $this->appConfig->getValueInt($this->appName, 'last_updated_well_known', 0);
         $age = time() - $lastFetched;
@@ -283,6 +324,10 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
             return $resp;
         }
 
+        if (!\is_string($resp)) {
+            return $resp;
+        }
+
         $this->appConfig->setValueString($this->appName, 'well-known', $resp);
         $this->appConfig->setValueInt($this->appName, 'last_updated_well_known', time());
 
@@ -294,11 +339,9 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
      * This reduces the requests required to the provider and increases the response time,
      * especially when using WebDAV.
      *
-     * @param bool $ignore_cache
-     *
      * @throws \Jumbojett\OpenIDConnectClientException
      */
-    private function getJWKs($ignore_cache = false)
+    private function getJWKs(bool $ignore_cache = false): mixed
     {
         $lastFetched = $this->appConfig->getValueInt($this->appName, 'last_updated_jwks', 0);
 
@@ -320,7 +363,11 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
         }
 
         // Avoid recursion
-        $resp = parent::fetchURL($this->getProviderConfigValue('jwks_uri'));
+        $jwksUri = $this->getProviderConfigValue('jwks_uri');
+        if (!\is_string($jwksUri)) {
+            throw new \Jumbojett\OpenIDConnectClientException('Invalid jwks_uri in provider configuration');
+        }
+        $resp = parent::fetchURL($jwksUri);
 
         // Don't cache non-200 responses.
         // As we didn't find any specification in the standard, what 200 code it should exactly be,
@@ -331,6 +378,10 @@ class OpenIDConnectClient extends \Jumbojett\OpenIDConnectClient
                 ['app' => $this->appName]
             );
 
+            return $resp;
+        }
+
+        if (!\is_string($resp)) {
             return $resp;
         }
 

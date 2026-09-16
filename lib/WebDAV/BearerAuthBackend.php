@@ -17,6 +17,9 @@ use Psr\Log\LoggerInterface;
 use Sabre\DAV\Auth\Backend\AbstractBearer;
 use Sabre\DAV\Auth\Plugin;
 
+/**
+ * @template-implements IEventListener<Event>
+ */
 class BearerAuthBackend extends AbstractBearer implements IEventListener
 {
     private string $appName;
@@ -27,9 +30,6 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
     private LoginService $loginService;
     private string $principalPrefix;
 
-    /**
-     * @param string $principalPrefix
-     */
     public function __construct(
         string $appName,
         IUserSession $userSession,
@@ -37,7 +37,7 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
         IConfig $config,
         LoggerInterface $logger,
         LoginService $loginService,
-        $principalPrefix = 'principals/users/'
+        string $principalPrefix = 'principals/users/'
     ) {
         $this->appName = $appName;
         $this->userSession = $userSession;
@@ -52,6 +52,12 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
         $this->realm = $defaults->getName();
     }
 
+    /**
+     * @param string $bearerToken
+     *
+     * @return false|string
+     */
+    #[\Override]
     public function validateBearerToken($bearerToken)
     {
         \OC_Util::setupFS(); // login hooks may need early access to the filesystem
@@ -67,7 +73,10 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
         }
 
         if ($this->userSession->isLoggedIn()) {
-            return $this->setupUserFs($this->userSession->getUser()->getUID());
+            $user = $this->userSession->getUser();
+            if (null !== $user) {
+                return $this->setupUserFs($user->getUID());
+            }
         }
 
         return false;
@@ -77,6 +86,7 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
      * Implements IEventListener::handle.
      * Registers this class as an authentication backend with Sabre WebDav.
      */
+    #[\Override]
     public function handle(Event $event): void
     {
         if (!$event instanceof SabrePluginAuthInitEvent
@@ -84,7 +94,11 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
             return;
         }
 
-        $authPlugin = $event->getServer()->getPlugin('auth');
+        $server = $event->getServer();
+        if (null === $server) {
+            return;
+        }
+        $authPlugin = $server->getPlugin('auth');
         if ($authPlugin instanceof Plugin) {
             $webdav_enabled = $this->config->getSystemValue('oidc_login_webdav_enabled', false);
 
@@ -94,7 +108,7 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
         }
     }
 
-    private function setupUserFs(string $userId)
+    private function setupUserFs(string $userId): string
     {
         \OC_Util::setupFS($userId);
         $this->session->close();
@@ -110,9 +124,6 @@ class BearerAuthBackend extends AbstractBearer implements IEventListener
     private function login(string $bearerToken): void
     {
         $client = $this->loginService->createOIDCClient();
-        if (null === $client) {
-            throw new \Exception("Couldn't create OIDC client!");
-        }
 
         $client->validateBearerToken($bearerToken);
 

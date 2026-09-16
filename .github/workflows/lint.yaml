@@ -17,6 +17,7 @@ jobs:
         with:
           xml-file: ./appinfo/info.xml
           xml-schema-file: ./info.xsd
+
   php-cs-fixer:
     name: PHP-CS-Fixer
     runs-on: ubuntu-latest
@@ -26,3 +27,33 @@ jobs:
         uses: docker://oskarstark/php-cs-fixer-ga
         with:
           args: --dry-run --diff lib
+
+  psalm:
+    name: Psalm
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-versions: ['8.3']
+        server-versions: ['stable35']
+    steps:
+      - name: Checkout server
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+          repository: nextcloud/server
+          ref: ${{ matrix.server-versions }}
+      - name: Checkout the app
+        uses: actions/checkout@v6
+        with:
+          path: apps/oidc_login
+      - name: Set up php ${{ matrix.php-versions }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-versions }}
+      - name: Install dependencies
+        working-directory: apps/oidc_login
+        run: composer install
+      - name: Run Psalm
+        working-directory: apps/oidc_login
+        run: vendor/bin/psalm --no-cache --threads=max

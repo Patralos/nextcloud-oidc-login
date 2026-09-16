@@ -29,11 +29,13 @@ class OIDCLoginOption implements IAlternativeLogin
         $this->request = $request;
     }
 
+    #[\Override]
     public function getLabel(): string
     {
         return $this->l->t($this->config->getSystemValue('oidc_login_button_text', 'OpenID Connect'));
     }
 
+    #[\Override]
     public function getLink(): string
     {
         return $this->getLoginLink($this->request, $this->url);
@@ -46,10 +48,12 @@ class OIDCLoginOption implements IAlternativeLogin
         ]);
     }
 
+    #[\Override]
     public function getClass(): string
     {
         return 'oidc-button';
     }
 
+    #[\Override]
     public function load(): void {}
 }

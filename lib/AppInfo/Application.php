@@ -6,6 +6,7 @@ namespace OCA\OIDCLogin\AppInfo;
 
 use OC\AppFramework\Utility\ControllerMethodReflector;
 use OCA\OIDCLogin\OIDCLoginOption;
+use OCA\OIDCLogin\OIDCLoginProvider;
 use OCA\OIDCLogin\WebDAV\BasicAuthBackend;
 use OCA\OIDCLogin\WebDAV\BearerAuthBackend;
 use OCP\AppFramework\App;
@@ -27,16 +28,17 @@ class Application extends App implements IBootstrap
     protected IL10N $l;
     protected IConfig $config;
 
-    private $appName = 'oidc_login';
+    private string $appName = 'oidc_login';
 
     public function __construct()
     {
         parent::__construct($this->appName);
     }
 
+    #[\Override]
     public function register(IRegistrationContext $context): void
     {
-        $context->registerAlternativeLogin(OIDCLoginOption::class);
+        $context->registerAlternativeLoginProvider(OIDCLoginProvider::class);
 
         $context->registerEventListener(
             'OCA\DAV\Connector\Sabre::authInit',
@@ -59,6 +61,7 @@ class Application extends App implements IBootstrap
         );
     }
 
+    #[\Override]
     public function boot(IBootContext $context): void
     {
         $container = $context->getAppContainer();
@@ -95,7 +98,7 @@ class Application extends App implements IBootstrap
             /* Redirect to logout URL on completing logout
                If do not have logout URL, go to noredir on logout */
             if ($logoutUrl = $session->get('oidc_logout_url', $noRedirLoginUrl)) {
-                $userSession->listen('\OC\User', 'postLogout', function () use ($logoutUrl, $session) {
+                $userSession->listen('\OC\User', 'postLogout', function () use ($logoutUrl, $session): void {
                     // Do nothing if this is a CORS request
                     if ($this->getContainer()->get(ControllerMethodReflector::class)->hasAnnotation('CORS')) {
                         return;
@@ -159,7 +162,7 @@ class Application extends App implements IBootstrap
         }
     }
 
-    public function isApiRequest()
+    public function isApiRequest(): bool
     {
         return isset($_SERVER['HTTP_ACCEPT']) && false !== strpos($_SERVER['HTTP_ACCEPT'], 'application/json');
     }

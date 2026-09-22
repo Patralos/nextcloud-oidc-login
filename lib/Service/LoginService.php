@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\OIDCLogin\Service;
 
 use OC\Authentication\Token\IProvider;
@@ -22,7 +24,7 @@ use Psr\Log\LoggerInterface;
 
 class LoginService
 {
-    public const USER_AGENT = 'NextcloudOIDCLogin';
+    public const string USER_AGENT = 'NextcloudOIDCLogin';
 
     private IAccountManager $accountManager;
     private IAvatarManager $avatarManager;
@@ -272,7 +274,12 @@ class LoginService
 
         // Force a UID for existing users with a different
         // user ID in nextcloud than in LDAP
-        return $ldap->dn2UserName($dn);
+        $uid = $ldap->dn2UserName($dn);
+        if (false === $uid) {
+            return null;
+        }
+
+        return $uid;
     }
 
     /**
@@ -371,12 +378,16 @@ class LoginService
     private function updateBasicProfile(IUser $user, array $profile): void
     {
         if (null !== ($name = $this->attr->name($profile))) {
-            $user->setDisplayName($name ?: $this->attr->id($profile));
+            $fallbackId = $this->attr->id($profile);
+            $displayName = '' !== $name ? $name : $fallbackId;
+            if (null !== $displayName && '' !== $displayName) {
+                $user->setDisplayName($displayName);
+            }
         }
 
         if (null !== ($mail = $this->attr->mail($profile))) {
             if ($user->getSystemEMailAddress() !== $mail) {
-                $user->setSystemEMailAddress((string) $mail);
+                $user->setSystemEMailAddress($mail);
             }
         }
 
@@ -404,7 +415,7 @@ class LoginService
 
         // Set quota
         if (null !== ($quota = $this->attr->quota($profile))) {
-            $user->setQuota((string) $quota);
+            $user->setQuota($quota);
         } else {
             if ($defaultQuota = $this->config->getSystemValue('oidc_login_default_quota')) {
                 $user->setQuota((string) $defaultQuota);
@@ -415,19 +426,22 @@ class LoginService
             && ($photoURL = $this->attr->photoURL($profile))) {
             try {
                 $curl = curl_init($photoURL);
+                if (false === $curl) {
+                    return;
+                }
                 curl_setopt($curl, CURLOPT_HEADER, false);
                 curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($curl, CURLOPT_USERAGENT, self::USER_AGENT);
 
                 $avatar = $this->avatarManager->getAvatar($user->getUid());
-                if ($avatar) {
+                if ($avatar->exists()) {
                     $last_modified = $avatar->getFile(64)->getMTime();
                     $formatted_date = date('D, d M Y H:i:s \G\M\T', $last_modified);
                     curl_setopt($curl, CURLOPT_HTTPHEADER, ["If-Modified-Since: {$formatted_date}"]);
                 }
                 $raw = curl_exec($curl);
 
-                if (200 === curl_getinfo($curl, CURLINFO_HTTP_CODE)) {
+                if (200 === curl_getinfo($curl, CURLINFO_HTTP_CODE) && \is_string($raw)) {
                     $image = new \OCP\Image();
                     $image->loadFromData($raw);
                     $image->centerCrop();

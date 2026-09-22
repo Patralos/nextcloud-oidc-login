@@ -76,7 +76,7 @@
     ],
     "git.alwaysSignOff": true,
     "editor.formatOnSave": true,
-    "intelephense.environment.phpVersion": "8.2.0",
+    "intelephense.environment.phpVersion": "8.3.0",
     "intelephense.environment.documentRoot": "../..",
     "intelephense.environment.includePaths": ["../.."],
     "php.validate.enable": false,

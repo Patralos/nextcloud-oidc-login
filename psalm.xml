@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<psalm
+    totallyTyped="true"
+    errorLevel="3"
+    resolveFromConfigFile="true"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://getpsalm.org/schema/config"
+    xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+    cacheDirectory=".cache/psalm"
+    findUnusedBaselineEntry="true"
+    findUnusedCode="false"
+    phpVersion="8.3"
+>
+    <projectFiles>
+        <directory name="lib" />
+        <ignoreFiles>
+            <directory name="vendor" />
+            <directory name="3rdparty" />
+            <directory name="../../lib" />
+            <directory name="../../apps/files" />
+            <directory name="../../apps/dav" />
+            <directory name="../../apps/files_external" />
+            <directory name="../../apps/user_ldap" />
+            <directory name="../../3rdparty" />
+        </ignoreFiles>
+    </projectFiles>
+    <extraFiles>
+        <directory name="../../lib" />
+        <directory name="../../apps/dav" />
+        <directory name="../../apps/files_external" />
+        <directory name="../../apps/user_ldap" />
+        <directory name="../../3rdparty/sabre" />
+        <directory name="../../3rdparty/psr" />
+        <directory name="3rdparty/jumbojett" />
+    </extraFiles>
+    <issueHandlers>
+        <PossiblyFalseArgument>
+            <errorLevel type="suppress">
+                <directory name="lib/" />
+            </errorLevel>
+        </PossiblyFalseArgument>
+        <RiskyTruthyFalsyComparison>
+            <errorLevel type="suppress">
+                <directory name="lib/" />
+            </errorLevel>
+        </RiskyTruthyFalsyComparison>
+    </issueHandlers>
+    <forbiddenFunctions>
+        <function name="var_dump" />
+        <function name="print" />
+        <function name="print_r" />
+    </forbiddenFunctions>
+</psalm>

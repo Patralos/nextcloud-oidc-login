@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\OIDCLogin\Service;
 
 use OCP\IConfig;
@@ -10,7 +12,7 @@ class AttributeMap
     private string $_id;
 
     /** Display name of user */
-    private string $_name;
+    private string $_name = '';
 
     /** Full display name of user (optional) */
     private ?array $_full_name = null;
@@ -31,7 +33,7 @@ class AttributeMap
     private string $_ldapUid;
 
     /** Array or space separated string of NC groups for the user */
-    private array|string $_groups;
+    private string $_groups;
 
     /** Array or space separated string of login filter values for the user */
     private string $_login_filter;
@@ -129,6 +131,10 @@ class AttributeMap
      */
     public function birthdate(array $profile): ?string
     {
+        if (null === $this->_birthdate) {
+            return null;
+        }
+
         return self::get($this->_birthdate, $profile);
     }
 
@@ -145,7 +151,12 @@ class AttributeMap
      */
     public function quota(array $profile): ?string
     {
-        return self::get($this->_quota, $profile);
+        $quota = self::get($this->_quota, $profile);
+        if (null !== $quota) {
+            return (string) $quota;
+        }
+
+        return null;
     }
 
     /**
@@ -205,15 +216,19 @@ class AttributeMap
     /**
      * Get admin status from profile.
      */
-    public function isAdmin(array $profile): ?string
+    public function isAdmin(array $profile): bool
     {
-        return self::get($this->_isAdmin, $profile);
+        if (null === $this->_isAdmin) {
+            return false;
+        }
+
+        return (bool) self::get($this->_isAdmin, $profile);
     }
 
     /**
      * Returns whether the OIDC response has the groups field in it.
      */
-    public function hasGroups(array $profile)
+    public function hasGroups(array $profile): bool
     {
         return \array_key_exists($this->_groups, $profile);
     }
@@ -221,7 +236,7 @@ class AttributeMap
     /**
      * Returns whether the OIDC response has the login_filter field in it.
      */
-    public function hasLoginFilter(array $profile)
+    public function hasLoginFilter(array $profile): bool
     {
         return \array_key_exists($this->_login_filter, $profile);
     }
@@ -236,27 +251,35 @@ class AttributeMap
 
     /**
      * Function to remove unallowed characters.
-     *
-     * @param mixed $data
      */
-    private static function base64url_encode($data): string
+    private static function base64url_encode(mixed $data): string
     {
-        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+        return rtrim(strtr(base64_encode((string) $data), '+/', '-_'), '=');
     }
 
-    private static function get(string $attr, array $profile)
+    /**
+     * @param array<array-key, mixed> $profile
+     */
+    private static function get(string $attr, array $profile): mixed
     {
-        if (null !== $attr && \array_key_exists($attr, $profile)) {
+        if (\array_key_exists($attr, $profile)) {
             return $profile[$attr];
         }
 
         return null;
     }
 
-    private static function getFullDisplayName(array|string $attr, array $profile): string
+    /**
+     * @param array<array-key, mixed> $attr
+     * @param array<array-key, mixed> $profile
+     */
+    private static function getFullDisplayName(array $attr, array $profile): string
     {
         $nameArr = [];
         foreach ($attr as $value) {
+            if (!\is_string($value)) {
+                continue;
+            }
             $nameArr[] = self::get($value, $profile);
         }
 

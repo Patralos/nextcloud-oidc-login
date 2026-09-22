@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\OIDCLogin\WebDAV;
 
 use OCA\DAV\Events\SabrePluginAuthInitEvent;
@@ -7,14 +9,19 @@ use OCA\OIDCLogin\Service\LoginService;
 use OCP\Defaults;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
+use OCP\Files\ISetupManager;
 use OCP\IConfig;
 use OCP\ISession;
+use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\SabrePluginEvent;
 use Psr\Log\LoggerInterface;
 use Sabre\DAV\Auth\Backend\AbstractBasic;
 use Sabre\DAV\Auth\Plugin;
 
+/**
+ * @template-implements IEventListener<Event>
+ */
 class BasicAuthBackend extends AbstractBasic implements IEventListener
 {
     private string $appName;
@@ -23,10 +30,9 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
     private IConfig $config;
     private LoggerInterface $logger;
     private LoginService $loginService;
+    private IUserManager $userManager;
+    private ISetupManager $setupManager;
 
-    /**
-     * @param string $principalPrefix
-     */
     public function __construct(
         string $appName,
         IUserSession $userSession,
@@ -34,7 +40,9 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         IConfig $config,
         LoggerInterface $logger,
         LoginService $loginService,
-        $principalPrefix = 'principals/users/'
+        IUserManager $userManager,
+        ISetupManager $setupManager,
+        string $principalPrefix = 'principals/users/'
     ) {
         $this->appName = $appName;
         $this->userSession = $userSession;
@@ -42,6 +50,8 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         $this->config = $config;
         $this->logger = $logger;
         $this->loginService = $loginService;
+        $this->userManager = $userManager;
+        $this->setupManager = $setupManager;
         $this->principalPrefix = $principalPrefix;
 
         // setup realm
@@ -49,9 +59,16 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         $this->realm = $defaults->getName();
     }
 
+    /**
+     * @param string $username
+     * @param string $password
+     *
+     * @return bool
+     */
+    #[\Override]
     public function validateUserPass($username, $password)
     {
-        \OC_Util::setupFS(); // login hooks may need early access to the filesystem
+        $this->setupFs(); // login hooks may need early access to the filesystem
 
         if (!$this->userSession->isLoggedIn()) {
             try {
@@ -64,7 +81,12 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         }
 
         if ($this->userSession->isLoggedIn()) {
-            return $this->setupUserFs($this->userSession->getUser()->getUID());
+            $user = $this->userSession->getUser();
+            if (null !== $user) {
+                $this->setupUserFs($user->getUID());
+
+                return true;
+            }
         }
 
         return false;
@@ -74,6 +96,7 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
      * Implements IEventListener::handle.
      * Registers this class as an authentication backend with Sabre WebDav.
      */
+    #[\Override]
     public function handle(Event $event): void
     {
         if (!$event instanceof SabrePluginAuthInitEvent
@@ -81,7 +104,11 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
             return;
         }
 
-        $authPlugin = $event->getServer()->getPlugin('auth');
+        $server = $event->getServer();
+        if (null === $server) {
+            return;
+        }
+        $authPlugin = $server->getPlugin('auth');
         if ($authPlugin instanceof Plugin) {
             $webdav_enabled = $this->config->getSystemValue('oidc_login_webdav_enabled', false);
             $password_auth_enabled = $this->config->getSystemValue('oidc_login_password_authentication', false);
@@ -92,9 +119,9 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         }
     }
 
-    private function setupUserFs($userId)
+    private function setupUserFs(string $userId): string
     {
-        \OC_Util::setupFS($userId);
+        $this->setupFs($userId);
 
         /* On the v1 route /remote.php/webdav, a default nextcloud backend
          * tries and fails to authenticate users, then close the session.
@@ -108,12 +135,26 @@ class BasicAuthBackend extends AbstractBasic implements IEventListener
         return $this->principalPrefix.$userId;
     }
 
-    private function login(string $username, string $password)
+    /** Set up the user filesystem, or root if no user is available. */
+    private function setupFs(?string $userId = null): void
+    {
+        if (null === $userId) {
+            $user = $this->userSession->getUser();
+        } else {
+            $user = $this->userManager->get($userId);
+        }
+
+        if (null !== $user) {
+            $this->setupManager->setupForUser($user);
+        } else {
+            // A path without a user falls back to root setup internally
+            $this->setupManager->setupForPath('/');
+        }
+    }
+
+    private function login(string $username, string $password): void
     {
         $client = $this->loginService->createOIDCClient();
-        if (null === $client) {
-            throw new \Exception("Couldn't create OIDC client!");
-        }
 
         $client->addAuthParam([
             'username' => $username,
